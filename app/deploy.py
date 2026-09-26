@@ -1,16 +1,15 @@
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 import streamlit as st
-import pandas as pd
-import joblib
+from src.score import score_customer
 
 st.set_page_config(page_title="Return Risk Scoring", layout="centered")
-
-# Model load karo
-model = joblib.load("models/risk_model.pkl")
-
 st.title("🔍 Return Fraud & Risk Scoring System")
-st.write("Customer ka behavior daalo, risk score turant dekho.")
+st.write("Enter a customer's order and return behavior to get their risk score.")
 
-st.header("Customer Details Daalo")
+st.header("Customer Details")
 
 total_orders = st.number_input("Total Orders", min_value=1, value=10)
 total_returns = st.number_input("Total Returns", min_value=0, value=2)
@@ -24,8 +23,7 @@ payment_method = st.selectbox("Payment Method", ["COD", "Credit Card", "Debit Ca
 preferred_category = st.selectbox("Preferred Category", ["Fashion", "Electronics", "Home & Kitchen", "Beauty", "Footwear", "Mobiles", "Books"])
 
 if st.button("Check Risk Score"):
-    # Input ko model ke format mein convert karo
-    input_data = pd.DataFrame([{
+    customer = {
         "account_age_days": account_age_days,
         "total_orders": total_orders,
         "total_returns": total_returns,
@@ -36,22 +34,9 @@ if st.button("Check Risk Score"):
         "refund_to_wallet_pref": refund_to_wallet_pref,
         "payment_method": payment_method,
         "preferred_category": preferred_category
-    }])
+    }
 
-    # Same encoding jo training mein ki thi
-    input_encoded = pd.get_dummies(input_data, columns=["payment_method", "preferred_category"])
-
-    # Model ke expected columns se match karo (missing columns 0 se fill karo)
-    model_columns = model.feature_names_in_
-    for col in model_columns:
-        if col not in input_encoded.columns:
-            input_encoded[col] = 0
-    input_encoded = input_encoded[model_columns]
-
-    # Prediction
-    risk_prob = model.predict_proba(input_encoded)[0][1]
-    risk_score = round(risk_prob * 100, 1)
-
+    risk_score = round(score_customer(customer) * 100, 1)
     st.subheader(f"Risk Score: {risk_score}%")
     if risk_score >= 50:
         st.error("⚠️ High Risk — Manual review recommended")
